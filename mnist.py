@@ -5,6 +5,7 @@ from tensorflow import summary
 from tensorflow.examples.tutorials.mnist import input_data
 
 from ops import *
+from utils import *
 
 FLAGS = None
 
@@ -52,20 +53,36 @@ class Model_MNIST(object):
 
     # Learn
     for epoch in range(FLAGS.epochs):
+      train_loss = None
+      val_loss = None
+
+      # Iterate over batches
       for i in range(n_batches):
         inputs, labels = dataset.train.next_batch(FLAGS.bs)
-        _, summary_str, loss = self.session.run([train_step, loss_summary, self.loss], 
+        _, loss = self.session.run([train_step, self.loss],
           feed_dict={
             self.inputs: inputs,
             self.labels: labels 
           })
+        train_loss = loss
 
-        # Log progress
-        writer.add_summary(summary_str, epoch * n_batches + i)
-        frac = (i + 1)/ n_batches
-        sys.stdout.write('\r')
-        sys.stdout.write('Epoch (%d/%d): \t[%-20s] %d%% \tLoss: %.8f' % \
-          (epoch + 1, FLAGS.epochs, '='*int(frac*20), int(frac*100), loss))
-        sys.stdout.flush()
+        # Log validation loss at every 100th minibatch or end of epoch
+        if (i % 150 == 0) or (i == n_batches - 1):
+          _, summary_str, val_loss = self.session.run([train_step, loss_summary, self.loss],
+          feed_dict={
+            self.inputs: dataset.validation.images,
+            self.labels: dataset.validation.labels
+          })
+
+          # Log progress
+          writer.add_summary(summary_str, epoch * n_batches + i)
+          frac = (i + 1)/ n_batches
+          sys.stdout.write('\r')
+          sys.stdout.write((\
+            col(CYAN, 'Epoch (%d/%d):') + col(BOLD, '\t[%-10s] %d%% \t') + \
+            col(YELLOW, 'Train Loss:') + col(None, ' %.8f ') + '\t' + \
+            col(YELLOW, 'Val Loss:') + col(None, ' %.8f')) % \
+            (epoch + 1, FLAGS.epochs, '='*int(frac*10), int(frac*100), train_loss, val_loss))
+          sys.stdout.flush()
 
       sys.stdout.write('\n')
